@@ -1,149 +1,164 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 import os
 import random
 import textwrap
+import openai
 
 
 class WojakMemeGenerator:
     def __init__(self, template_dir: str = "templates"):
         self.template_dir = template_dir
 
-        # Scan for available templates
-        self.templates = {
-            "chad": [f for f in os.listdir(template_dir) if f.startswith("chad")],
-            "virgin": [f for f in os.listdir(template_dir) if f.startswith("virgin")],
+        # Map matching templates
+        self.template_pairs = self._map_template_pairs()
+
+        # Target dimensions for consistency
+        self.target_dimensions = (300, 400)  # height and width for figures
+
+        # Define text positioning for surrounding text
+        self.text_positions = {
+            "virgin": [
+                (0.2, 0.2, "top"),  # top left
+                (0.1, 0.4, "left"),  # middle left
+                (0.2, 0.6, "bottom"),  # bottom left
+            ],
+            "chad": [
+                (0.7, 0.2, "top"),  # top right
+                (0.8, 0.4, "right"),  # middle right
+                (0.7, 0.6, "bottom"),  # bottom right
+            ],
         }
 
-        # Define text styling for each character type
-        self.text_styles = {
-            "chad": {
-                "size": 36,
-                "color": (0, 0, 0),
-                "max_width": 25,  # words per line
-            },
-            "virgin": {
-                "size": 24,
-                "color": (0, 0, 0),
-                "max_width": 35,  # words per line
-            },
-        }
+    def _map_template_pairs(self) -> List[Tuple[str, str]]:
+        """Map virgin and chad templates that should go together"""
+        virgin_templates = sorted(
+            [f for f in os.listdir(self.template_dir) if f.startswith("virgin")]
+        )
+        chad_templates = sorted(
+            [f for f in os.listdir(self.template_dir) if f.startswith("chad")]
+        )
 
-        # Define template positions and sizes
-        self.layout = {
-            "canvas_size": (1200, 800),
-            "left": {"image": (50, 100), "text_start": (50, 600)},
-            "right": {"image": (600, 100), "text_start": (600, 600)},
-        }
+        # Pair matching numbered templates
+        return list(zip(virgin_templates, chad_templates))
 
-    def _select_template(self, template_type: str) -> str:
-        """Randomly select a template from available options"""
-        available_templates = self.templates[template_type]
-        if not available_templates:
-            raise Exception(
-                f"No {template_type} templates found in {self.template_dir}"
-            )
-        return random.choice(available_templates)
+    def _resize_template(self, img: Image.Image) -> Image.Image:
+        """Resize image to target dimensions while maintaining aspect ratio"""
+        aspect_ratio = img.width / img.height
+        new_height = self.target_dimensions[0]
+        new_width = int(new_height * aspect_ratio)
 
-    def _load_template(self, template_file: str) -> Image.Image:
-        """Load and return the template image"""
-        try:
-            path = os.path.join(self.template_dir, template_file)
-            img = Image.open(path).convert("RGBA")
+        return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-            # Resize image to a reasonable height while maintaining aspect ratio
-            target_height = 400
-            aspect_ratio = img.width / img.height
-            target_width = int(target_height * aspect_ratio)
-            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+    def _generate_argument_points(self, topic: str, is_chad: bool) -> List[str]:
+        """Generate appropriate points for either chad or virgin side"""
+        # This is a simplified version - in practice, you'd want to use a more sophisticated
+        # text generation approach, possibly with GPT-3 or similar
 
-            return img
-        except FileNotFoundError:
-            raise Exception(f"Template file {template_file} not found")
+        chad_templates = [
+            "Embraces {topic} fully",
+            "Masters {topic} effortlessly",
+            "Innovates with {topic}",
+            "Leads others in {topic}",
+            "Confident about {topic}",
+        ]
 
-    def _add_text(
-        self, image: Image.Image, text: str, position: Tuple[int, int], style: str
+        virgin_templates = [
+            "Afraid of {topic}",
+            "Struggles with basic {topic}",
+            "Complains about {topic}",
+            "Never truly understands {topic}",
+            "Avoids {topic} completely",
+        ]
+
+        templates = chad_templates if is_chad else virgin_templates
+        return [
+            template.format(topic=topic) for template in random.sample(templates, 3)
+        ]
+
+    def _add_surrounding_text(
+        self,
+        image: Image.Image,
+        texts: List[str],
+        positions: List[Tuple[float, float, str]],
+        is_chad: bool,
     ) -> Image.Image:
-        """Add styled text to the image"""
+        """Add text surrounding the figure"""
         draw = ImageDraw.Draw(image)
-        text_style = self.text_styles[style]
 
-        # Use a default system font
         try:
-            # Try to use Arial or a similar font if available
             font = ImageFont.truetype(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                text_style["size"],
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20
             )
         except OSError:
-            try:
-                font = ImageFont.truetype(
-                    "/System/Library/Fonts/Arial.ttf", text_style["size"]
-                )
-            except OSError:
-                font = ImageFont.load_default()
-                print("Warning: Using default font as system fonts not found")
+            font = ImageFont.load_default()
 
-        # Wrap text
-        wrapped_text = textwrap.fill(text, width=text_style["max_width"])
+        canvas_width, canvas_height = image.size
 
-        # Add text with outline for better readability
-        outline_color = (255, 255, 255)
-        outline_width = 2
+        for text, (x, y, align) in zip(texts, positions):
+            x_pos = int(x * canvas_width)
+            y_pos = int(y * canvas_height)
 
-        # Draw text outline
-        for adj in range(-outline_width, outline_width + 1):
-            for adj2 in range(-outline_width, outline_width + 1):
-                if adj != 0 or adj2 != 0:
+            # Add white outline for better readability
+            outline_color = (255, 255, 255)
+            text_color = (0, 0, 0)
+            outline_width = 2
+
+            for dx in [-outline_width, outline_width]:
+                for dy in [-outline_width, outline_width]:
                     draw.text(
-                        (position[0] + adj, position[1] + adj2),
-                        wrapped_text,
-                        font=font,
-                        fill=outline_color,
+                        (x_pos + dx, y_pos + dy), text, font=font, fill=outline_color
                     )
 
-        # Draw main text
-        draw.text(position, wrapped_text, font=font, fill=text_style["color"])
+            draw.text((x_pos, y_pos), text, font=font, fill=text_color)
 
         return image
 
-    def generate_meme(
-        self, chad_text: str, virgin_text: str, chad_side: str = "right"
-    ) -> Image.Image:
+    def generate_meme(self, topic: str, chad_side: str = "right") -> Image.Image:
         """Generate the complete Virgin vs Chad meme"""
-        # Create base canvas (white background)
-        canvas = Image.new("RGBA", self.layout["canvas_size"], (255, 255, 255, 255))
+        # Select a random template pair
+        virgin_template, chad_template = random.choice(self.template_pairs)
 
-        # Select and load templates
-        chad_template = self._select_template("chad")
-        virgin_template = self._select_template("virgin")
+        # Create base canvas
+        canvas = Image.new("RGBA", (1200, 800), (255, 255, 255, 255))
 
-        chad_img = self._load_template(chad_template)
-        virgin_img = self._load_template(virgin_template)
+        # Load and resize templates
+        virgin_img = self._resize_template(
+            Image.open(os.path.join(self.template_dir, virgin_template)).convert("RGBA")
+        )
+        chad_img = self._resize_template(
+            Image.open(os.path.join(self.template_dir, chad_template)).convert("RGBA")
+        )
 
-        # Position images based on chad_side
+        # Generate argument points
+        chad_texts = self._generate_argument_points(topic, True)
+        virgin_texts = self._generate_argument_points(topic, False)
+
+        # Position images and text based on chad_side
         if chad_side == "right":
-            canvas.paste(virgin_img, self.layout["left"]["image"], virgin_img)
-            canvas.paste(chad_img, self.layout["right"]["image"], chad_img)
+            # Paste images
+            canvas.paste(virgin_img, (200, 200), virgin_img)
+            canvas.paste(chad_img, (700, 200), chad_img)
 
-            # Add text
-            canvas = self._add_text(
-                canvas, virgin_text, self.layout["left"]["text_start"], "virgin"
+            # Add surrounding text
+            canvas = self._add_surrounding_text(
+                canvas, virgin_texts, self.text_positions["virgin"], False
             )
-            canvas = self._add_text(
-                canvas, chad_text, self.layout["right"]["text_start"], "chad"
+            canvas = self._add_surrounding_text(
+                canvas, chad_texts, self.text_positions["chad"], True
             )
         else:
-            canvas.paste(chad_img, self.layout["left"]["image"], chad_img)
-            canvas.paste(virgin_img, self.layout["right"]["image"], virgin_img)
+            # Paste images
+            canvas.paste(chad_img, (200, 200), chad_img)
+            canvas.paste(virgin_img, (700, 200), virgin_img)
 
-            # Add text
-            canvas = self._add_text(
-                canvas, chad_text, self.layout["left"]["text_start"], "chad"
+            # Add surrounding text
+            canvas = self._add_surrounding_text(
+                canvas, chad_texts, self.text_positions["virgin"], True
             )
-            canvas = self._add_text(
-                canvas, virgin_text, self.layout["right"]["text_start"], "virgin"
+            canvas = self._add_surrounding_text(
+                canvas, virgin_texts, self.text_positions["chad"], False
             )
 
         return canvas
@@ -152,16 +167,14 @@ class WojakMemeGenerator:
 def main():
     generator = WojakMemeGenerator()
 
-    # Example usage
-    chad_text = "Embraces new technologies\nMasters multiple programming languages\nBuilds scalable solutions"
-    virgin_text = "Afraid of learning new things\nOnly knows one language\nCopy-pastes from Stack Overflow"
+    # Example usage with a topic
+    topic = "programming"
 
-    # Generate meme
-    meme = generator.generate_meme(
-        chad_text=chad_text, virgin_text=virgin_text, chad_side="right"  # or "left"
-    )
+    # Generate meme with random chad/virgin side assignment
+    chad_side = random.choice(["left", "right"])
+    meme = generator.generate_meme(topic=topic, chad_side=chad_side)
 
-    meme.save("virgin_vs_chad_meme.png")
+    meme.save("virgin_vs_chad_meme2.png")
 
 
 if __name__ == "__main__":

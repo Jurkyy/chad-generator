@@ -1,0 +1,26 @@
+[project]
+authors = [{name = "Wolfgang Bubberman", email = "wolfbubberman@gmail.com"}]
+dependencies = []
+description = "Add a short description here"
+name = "chad-generator"
+requires-python = ">= 3.11"
+version = "0.1.0"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+chad_generator = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+numpy = ">=2.1.3,<3"
+dataclasses = ">=0.8,<0.9"
+typing = ">=3.10.0.0,<4"
+pillow = ">=11.0.0,<12"

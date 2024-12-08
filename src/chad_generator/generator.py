@@ -37,30 +37,35 @@ class ArgumentGenerator:
 
         if self.use_api:
             try:
-                prompt = f"""Generate {num_points} short, punchy bullet points for a Virgin vs Chad meme comparing {topic_parts[0]} vs {topic_parts[1]}.
-                Focus on the {'chad/superior' if is_chad else 'virgin/inferior'} aspects of {topic}.
-                
+                prompt = f"""Generate {num_points} contrasting bullet points for a Virgin vs Chad meme comparing {topic_parts[0]} vs {topic_parts[1]}.
+                Focus on the {'chad/superior' if is_chad else 'virgin/inferior'} aspects of {topic} and only show me those {num_points}.
+
                 Rules:
-                - Each point MUST be 25 characters or less
-                - Use absurd, over-the-top comparisons
-                - Embrace ridiculous extremes
-                - Include specific, concrete details
-                
-                Example Chad points:
-                - Crunch echoes for miles
-                - Fears nothing, fears no one
-                - Scientists study its power
-                - Awarded Nobel Prize daily
-                - Even gods respect it
-                
-                Example Virgin points:
-                - Cries when touched
-                - Needs user manual
-                - Still uses training wheels
-                - Mother picks his clothes
-                - Everyone laughs at him
-                
-                Format: Return ONLY bullet points, nothing else."""
+                - Each point must be under 40 characters
+                - Embrace absurd, hyperbolic comparisons
+                - Mix physical and behavioral traits
+                - Include both serious and ridiculous elements
+                - Focus on stereotypical extremes
+
+                Example Comparison - Worker vs Unemployed:
+
+                Virgin Worker:
+                - Bags under eyes from overtime
+                - Dead inside from meetings
+                - Lives for weekend coffee breaks
+                - No time for dating or hobbies
+                - Corporate slave mentality
+
+                Chad Unemployed:
+                - Perfect skin from zero stress
+                - Sleeps 12 hours like a king
+                - Has time to master 5 hobbies
+                - Government pays him to exist
+                - Never touched a spreadsheet
+
+                Format: Return only bullet points separated by newlines. No additional text or explanations.
+                Keep each side's traits thematically connected to create a stronger contrast.
+                """
 
                 response = self.client.messages.create(
                     model="claude-3-haiku-20240307",
@@ -73,8 +78,14 @@ class ArgumentGenerator:
                     for p in response.content[0].text.strip().split("\n")
                     if p.strip()
                     and not p.strip().startswith("Here")
-                    and len(p.strip()) <= 25
+                    and not p.strip().endswith(":")  # Exclude headers
+                    and p.strip().startswith("-")  # Only include bullet points
                 ]
+
+                # If you still want to enforce a length limit, you could do:
+                points = [
+                    p[2:].strip() for p in points
+                ]  # Remove "- " from the beginning
 
                 if len(points) != num_points:
                     return self._generate_themed_points(topic, is_chad, num_points)
@@ -311,7 +322,7 @@ class WojakMemeGenerator:
 def main():
     # You'll need to provide your Anthropic API key
     api_key = os.environ["ANTHROPIC_API_KEY"]
-    generator = WojakMemeGenerator()
+    generator = WojakMemeGenerator(api_key=api_key)
 
     # Example usage
     topic = "Bananas vs Apples"

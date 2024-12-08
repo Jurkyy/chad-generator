@@ -287,8 +287,8 @@ class WojakMemeGenerator:
         virgin_title_width = virgin_bbox[2] - virgin_bbox[0]
         chad_title_width = chad_bbox[2] - chad_bbox[0]
 
-        virgin_title_x = virgin_x + virgin_img.width // 2 - virgin_title_width // 2
-        chad_title_x = chad_x + chad_img.width // 2 - chad_title_width // 2
+        virgin_title_x = virgin_x - virgin_title_width // 2
+        chad_title_x = chad_x - chad_title_width // 2
 
         self._add_text_with_outline(
             draw, virgin_title, (virgin_title_x, 100), font, True
@@ -311,7 +311,7 @@ class WojakMemeGenerator:
 def main():
     # You'll need to provide your Anthropic API key
     api_key = os.environ["ANTHROPIC_API_KEY"]
-    generator = WojakMemeGenerator(api_key=api_key)
+    generator = WojakMemeGenerator()
 
     # Example usage
     topic = "Bananas vs Apples"

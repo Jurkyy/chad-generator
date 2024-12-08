@@ -132,7 +132,7 @@ class TextLayoutManager:
 
         # Horizontal spread ranges
         self.spreads = {
-            "virgin": (self.width * 0.05, self.width * 0.3),  # Left side spread
+            "virgin": (self.width * 0.05, self.width * 0.1),  # Left side spread
             "chad": (self.width * 0.7, self.width * 0.95),  # Right side spread
         }
 
@@ -287,8 +287,8 @@ class WojakMemeGenerator:
         virgin_title_width = virgin_bbox[2] - virgin_bbox[0]
         chad_title_width = chad_bbox[2] - chad_bbox[0]
 
-        virgin_title_x = virgin_x - virgin_title_width // 2
-        chad_title_x = chad_x - chad_title_width // 2
+        virgin_title_x = virgin_x + virgin_img.width // 4 - virgin_title_width // 2
+        chad_title_x = chad_x + chad_img.width // 4 - chad_title_width // 2
 
         self._add_text_with_outline(
             draw, virgin_title, (virgin_title_x, 100), font, True

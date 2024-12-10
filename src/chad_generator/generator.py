@@ -342,6 +342,10 @@ class WojakMemeGenerator:
 
 
 def _main_io_handling(topic, virgin_side):
+    # You'll need to provide your Anthropic API key
+    api_key = os.environ["ANTHROPIC_API_KEY"]
+    generator = WojakMemeGenerator(api_key=api_key)
+
     # Generate filename from topic
     safe_filename = "_".join(topic.lower().replace(" vs ", "_vs_").split())
     output_filename = f"res/virgin_vs_chad_meme_{safe_filename}.png"
@@ -354,10 +358,6 @@ def _main_io_handling(topic, virgin_side):
 
 
 def main():
-    # You'll need to provide your Anthropic API key
-    api_key = os.environ["ANTHROPIC_API_KEY"]
-    generator = WojakMemeGenerator(api_key=api_key)
-
     # Get topic from user
     print("Enter your comparison in the format 'X vs Y':")
     topic = input("> ").strip()

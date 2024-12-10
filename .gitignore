@@ -1,4 +1,4 @@
-
+src/chad_generator/res/*
 # pixi environments
 .pixi
 *.egg-info

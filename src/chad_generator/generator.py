@@ -68,7 +68,7 @@ class ArgumentGenerator:
                 """
 
                 response = self.client.messages.create(
-                    model="claude-3-haiku-20240307",
+                    model="claude-3-haiku-latest",
                     max_tokens=300,
                     messages=[{"role": "user", "content": prompt}],
                 )
@@ -88,6 +88,9 @@ class ArgumentGenerator:
                 ]  # Remove "- " from the beginning
 
                 if len(points) != num_points:
+                    print(
+                        f"{points=} does not seem to align with {num_points=}, this was the {response=}"
+                    )
                     return self._generate_themed_points(topic, is_chad, num_points)
 
                 return [self._format_point(p) for p in points]
@@ -347,7 +350,9 @@ def _main_io_handling(topic, virgin_side):
     generator = WojakMemeGenerator(api_key=api_key)
 
     # Generate filename from topic
-    safe_filename = "_".join(topic.lower().replace(" vs ", "_vs_").split())
+    safe_filename = "_".join(
+        (topic.lower().replace(" vs ", "_vs_") + virgin_side + "_").split()
+    )
     output_filename = f"res/virgin_vs_chad_meme_{safe_filename}.png"
 
     # Generate and save the meme

@@ -379,6 +379,7 @@ def main():
         elif choice == "3":
             _main_io_handling(topic, "right")
             _main_io_handling(topic, "left")
+            break
         else:
             print("Invalid choice. Please enter 1, 2 or 3.")
 

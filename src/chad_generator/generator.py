@@ -251,15 +251,37 @@ class WojakMemeGenerator:
             # Draw main text
             draw.text((x, line_y), line, font=font, fill=text_color)
 
-    def generate_meme(self, topic: str) -> Image.Image:
-        """Generate the complete Virgin vs Chad meme"""
+    def generate_meme(self, topic: str, virgin_side: str = "left") -> Image.Image:
+        """Generate the complete Virgin vs Chad meme
+
+        Args:
+            topic (str): Input in format "X vs Y"
+            virgin_side (str): Which side the virgin should be on ("left" or "right")
+                            Default is "left"
+
+        Returns:
+            Image.Image: Generated meme image
+        """
         canvas = Image.new("RGBA", self.canvas_size, (255, 255, 255, 255))
 
+        # Split the topic into two parts
         topic_parts = topic.split(" vs ")
         if len(topic_parts) != 2:
+            print("check splitting of topic, couldn't parse this input properly")
             topic_parts = (topic, topic)
+            print(topic_parts)
+            return 0
 
+        # Determine which topic goes on which side based on virgin_side parameter
+        if virgin_side.lower() == "right":
+            chad_topic, virgin_topic = topic_parts
+        else:  # default to virgin on left
+            virgin_topic, chad_topic = topic_parts
+
+        # Get templates
         virgin_template, chad_template = random.choice(self.template_pairs)
+
+        # Load and resize images
         virgin_img = self._resize_template(
             Image.open(os.path.join(self.template_dir, virgin_template)).convert("RGBA")
         )
@@ -319,15 +341,46 @@ class WojakMemeGenerator:
         return canvas
 
 
+def _main_io_handling(topic, virgin_side):
+    # Generate filename from topic
+    safe_filename = "_".join(topic.lower().replace(" vs ", "_vs_").split())
+    output_filename = f"res/virgin_vs_chad_meme_{safe_filename}.png"
+
+    # Generate and save the meme
+    print(f"\nGenerating meme...")
+    meme = generator.generate_meme(topic, virgin_side)
+    meme.save(output_filename)
+    print(f"Meme saved as: {output_filename}")
+
+
 def main():
     # You'll need to provide your Anthropic API key
     api_key = os.environ["ANTHROPIC_API_KEY"]
     generator = WojakMemeGenerator(api_key=api_key)
 
-    # Example usage
-    topic = "Bananas vs Apples"
-    meme = generator.generate_meme(topic=topic)
-    meme.save("virgin_vs_chad_meme.png")
+    # Get topic from user
+    print("Enter your comparison in the format 'X vs Y':")
+    topic = input("> ").strip()
+
+    # Get side preference
+    while True:
+        print("\nWhich side should be the 'Virgin'?")
+        print("1. Left side")
+        print("2. Right side")
+        print("3. Generate both sides")
+        choice = input("Enter 1, 2 or 3: ").strip()
+
+        if choice == "1":
+            _main_io_handling(topic, "left")
+            break
+        elif choice == "2":
+            _main_io_handling(topic, "right")
+            break
+        elif choice == "3":
+            _main_io_handling(topic, "right")
+            _main_io_handling(topic, "left")
+        else:
+            print("Invalid choice. Please enter 1, 2 or 3.")
 
 
 if __name__ == "__main__":

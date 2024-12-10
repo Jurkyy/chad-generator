@@ -1,11 +1,10 @@
-import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from typing import Dict, Tuple, List, Optional
 import os
+import json
 import random
 import textwrap
 import anthropic
-from math import cos, sin, pi
 
 
 class ArgumentGenerator:
@@ -30,76 +29,85 @@ class ArgumentGenerator:
         return "\n".join(lines)
 
     def generate_points(
-        self, topic_parts: Tuple[str, str], is_chad: bool, num_points: int = 5
-    ) -> List[str]:
-        """Generate exactly num_points points with consistent theming"""
-        topic = topic_parts[1] if is_chad else topic_parts[0]
+        self, topic: str, virgin, num_points: int = 5
+    ) -> Tuple[List[str], List[str]]:
+        """Generate exactly num_points points with consistent theming for both sides"""
 
-        if self.use_api:
+        try:
+            prompt = f"""Generate contrasting points for a Virgin vs Chad meme comparing {topic}. It should focus on the virgin being {virgin}
+
+            Requirements:
+            - Generate exactly {num_points} points per side
+            - Each point must be under 40 characters
+            - Embrace absurd, hyperbolic comparisons
+            - Mix physical and behavioral traits
+            - Include both serious and ridiculous elements
+            - Focus on stereotypical extremes
+
+            Return the response in the following JSON format:
+            {{
+                "virgin_points": ["point1", "point2", ...],
+                "chad_points": ["point1", "point2", ...]
+            }}
+
+            Example output format:
+            {{
+                "virgin_points": [
+                    "Bags under eyes from overtime",
+                    "Dead inside from meetings",
+                    "Lives for weekend coffee breaks",
+                    "No time for dating or hobbies",
+                    "Corporate slave mentality"
+                ],
+                "chad_points": [
+                    "Perfect skin from zero stress",
+                    "Sleeps 12 hours like a king",
+                    "Has time to master 5 hobbies",
+                    "Government pays him to exist",
+                    "Never touched a spreadsheet"
+                ]
+            }}
+
+            Ensure exactly {num_points} points per side and maintain thematic connections between opposing traits.
+            Return only the JSON, no additional text or explanations.
+            """
+
+            response = self.client.messages.create(
+                model="claude-3-5-haiku-latest",
+                max_tokens=300,
+                messages=[
+                    {"role": "user", "content": prompt},
+                    {
+                        "role": "assistant",
+                        "content": "I will respond with only valid JSON.",
+                    },
+                ],
+            )
+
             try:
-                prompt = f"""Generate {num_points} contrasting bullet points for a Virgin vs Chad meme comparing {topic_parts[0]} vs {topic_parts[1]}.
-                Focus on the {'chad/superior' if is_chad else 'virgin/inferior'} aspects of {topic} and only show me those {num_points}.
+                points_data = json.loads(response.content[0].text.strip())
+                virgin_points = points_data["virgin_points"]
+                chad_points = points_data["chad_points"]
 
-                Rules:
-                - Each point must be under 40 characters
-                - Embrace absurd, hyperbolic comparisons
-                - Mix physical and behavioral traits
-                - Include both serious and ridiculous elements
-                - Focus on stereotypical extremes
+                # Validate point counts
+                if len(virgin_points) != num_points or len(chad_points) != num_points:
+                    raise ValueError(
+                        f"Expected {num_points} points per side, got {len(virgin_points)} virgin and {len(chad_points)} chad points"
+                    )
 
-                Example Comparison - Worker vs Unemployed:
-
-                Virgin Worker:
-                - Bags under eyes from overtime
-                - Dead inside from meetings
-                - Lives for weekend coffee breaks
-                - No time for dating or hobbies
-                - Corporate slave mentality
-
-                Chad Unemployed:
-                - Perfect skin from zero stress
-                - Sleeps 12 hours like a king
-                - Has time to master 5 hobbies
-                - Government pays him to exist
-                - Never touched a spreadsheet
-
-                Format: Return only bullet points separated by newlines. No additional text or explanations.
-                Keep each side's traits thematically connected to create a stronger contrast.
-                """
-
-                response = self.client.messages.create(
-                    model="claude-3-haiku-latest",
-                    max_tokens=300,
-                    messages=[{"role": "user", "content": prompt}],
+                # Format the points
+                return (
+                    [self._format_point(p) for p in chad_points],
+                    [self._format_point(p) for p in virgin_points],
                 )
 
-                points = [
-                    p.strip()
-                    for p in response.content[0].text.strip().split("\n")
-                    if p.strip()
-                    and not p.strip().startswith("Here")
-                    and not p.strip().endswith(":")  # Exclude headers
-                    and p.strip().startswith("-")  # Only include bullet points
-                ]
+            except json.JSONDecodeError:
+                print(f"Failed to parse JSON response: {response.content[0].text}")
+                exit(2)
 
-                # If you still want to enforce a length limit, you could do:
-                points = [
-                    p[2:].strip() for p in points
-                ]  # Remove "- " from the beginning
-
-                if len(points) != num_points:
-                    print(
-                        f"{points=} does not seem to align with {num_points=}, this was the {response=}"
-                    )
-                    return self._generate_themed_points(topic, is_chad, num_points)
-
-                return [self._format_point(p) for p in points]
-
-            except Exception as e:
-                print(f"API generation failed: {e}")
-                return self._generate_themed_points(topic, is_chad, num_points)
-
-        return self._generate_themed_points(topic, is_chad, num_points)
+        except Exception as e:
+            print(f"API generation failed: {e}")
+            exit(1)
 
     def _generate_themed_points(
         self, topic: str, is_chad: bool, num_points: int
@@ -274,12 +282,12 @@ class WojakMemeGenerator:
             topic_parts = (topic, topic)
             print(topic_parts)
             return 0
-
-        # Determine which topic goes on which side based on virgin_side parameter
-        if virgin_side.lower() == "right":
-            chad_topic, virgin_topic = topic_parts
-        else:  # default to virgin on left
-            virgin_topic, chad_topic = topic_parts
+        if virgin_side == "left":
+            virgin = topic_parts[0]
+            chad = topic_parts[1]
+        else:
+            virgin = topic_parts[1]
+            chad = topic_parts[0]
 
         # Get templates
         virgin_template, chad_template = random.choice(self.template_pairs)
@@ -292,11 +300,8 @@ class WojakMemeGenerator:
             Image.open(os.path.join(self.template_dir, chad_template)).convert("RGBA")
         )
 
-        chad_points = self.argument_generator.generate_points(
-            topic_parts, True, self.layout_manager.num_points
-        )
-        virgin_points = self.argument_generator.generate_points(
-            topic_parts, False, self.layout_manager.num_points
+        chad_points, virgin_points = self.argument_generator.generate_points(
+            topic, virgin, self.layout_manager.num_points
         )
 
         draw = ImageDraw.Draw(canvas)
@@ -315,8 +320,8 @@ class WojakMemeGenerator:
         canvas.paste(chad_img, (chad_x, 250), chad_img)
 
         # Add centered titles
-        virgin_title = f"The Virgin {topic_parts[0]}"
-        chad_title = f"The Chad {topic_parts[1]}"
+        virgin_title = f"The Virgin {virgin}"
+        chad_title = f"The Chad {chad}"
 
         virgin_bbox = font.getbbox(virgin_title)
         chad_bbox = font.getbbox(chad_title)
@@ -351,7 +356,7 @@ def _main_io_handling(topic, virgin_side):
 
     # Generate filename from topic
     safe_filename = "_".join(
-        (topic.lower().replace(" vs ", "_vs_") + virgin_side + "_").split()
+        (topic.lower().replace(" vs ", "_vs_") + "_" + virgin_side).split()
     )
     output_filename = f"res/virgin_vs_chad_meme_{safe_filename}.png"
 

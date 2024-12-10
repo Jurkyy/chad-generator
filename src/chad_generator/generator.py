@@ -354,11 +354,18 @@ def _main_io_handling(topic, virgin_side):
     api_key = os.environ["ANTHROPIC_API_KEY"]
     generator = WojakMemeGenerator(api_key=api_key)
 
-    # Generate filename from topic
-    safe_filename = "_".join(
-        (topic.lower().replace(" vs ", "_vs_") + "_" + virgin_side).split()
-    )
-    output_filename = f"res/virgin_vs_chad_meme_{safe_filename}.png"
+    # Extract the two sides from the topic
+    sides = topic.lower().split(" vs ")
+    if len(sides) != 2:
+        raise ValueError("Topic must be in the format 'X vs Y'")
+
+    left_side, right_side = sides
+
+    # Swap sides if virgin is on the right
+    if virgin_side == "right":
+        left_side, right_side = right_side, left_side
+
+    output_filename = f"res/{left_side}_vs_{right_side}.png"
 
     # Generate and save the meme
     print(f"\nGenerating meme...")
